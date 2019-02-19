@@ -5,20 +5,39 @@ client.on('connect', function() {
     console.log('Redis client connected');
 });
 
-http.createServer(function(req, res) {
-    var query = require('url').parse(req.url,true).query;
-    console.log(query);
-    client.get("sharing_cookies_" + query.session_id, function(err, reply) {
-        if (err) {
-            console.log(err);
-            throw err;
+function getSessionID (request) {
+    var list = {},
+        rc = request.headers.cookie;
+
+    var session_id;
+    rc && rc.split(';').forEach(function( cookie ) {
+        var parts = cookie.split('=');
+        if (parts[0].trim() == 'shared_session_id') {
+            session_id = parts[1].trim();
         }
-        res.writeHead(200, {
-            'Content-Type': 'text/html'
-        });
-        res.end(
-            "session_id: " + query.session_id + "\n" +
-            "user_id: " + reply + "\n"
-        );
     });
+    return session_id;
+}
+
+http.createServer(function(req, res) {
+    var session_id = getSessionID(req);
+    console.log(session_id);
+    if (session_id == null) {
+        console.log("Cookies not set");
+        res.end("Cookies not set");
+    } else {
+        client.get("sharing_cookies_" + session_id, function(err, reply) {
+            if (err) {
+                console.log(err);
+                throw err;
+            }
+            res.writeHead(200, {
+                'Content-Type': 'text/html'
+            });
+            res.end(
+                "session_id: " + session_id + "<br>" +
+                "user_id: " + reply
+            );
+        });
+    }
 }).listen(8888, '127.0.0.1');
